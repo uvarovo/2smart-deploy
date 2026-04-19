@@ -1,0 +1,15 @@
+{
+  "name": "2smart-tuya-bridge",
+  "version": "1.0.0",
+  "description": "Universal Tuya Local bridge for 2Smart Standalone",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "DEBUG=tuya* node app.js"
+  },
+  "dependencies": {
+    "tuyapi": "^7.5.1",
+    "mqtt": "^4.3.7",
+    "debug": "^4.3.4"
+  }
+}

@@ -1,0 +1,67 @@
+{
+    "title": "Tuya Local Bridge",
+    "type": "tuya-bridge",
+    "registry": "2smart-tuya-bridge",
+    "configuration": {
+        "fields": [
+            {
+                "name": "DEVICE_NAME",
+                "type": "string",
+                "label": "Device name",
+                "default": "Tuya Device",
+                "validation": ["required", "string"]
+            },
+            {
+                "name": "TUYA_DEVICE_ID",
+                "type": "string",
+                "label": "Tuya Device ID",
+                "validation": ["required", "string"],
+                "placeholder": "e.g. bf8a6c3c3d79e6f1e5o1ug"
+            },
+            {
+                "name": "TUYA_LOCAL_KEY",
+                "type": "string",
+                "label": "Tuya Local Key",
+                "validation": ["required", "string"]
+            },
+            {
+                "name": "TUYA_LOCAL_IP",
+                "type": "string",
+                "label": "Device IP address",
+                "validation": ["required", "string"],
+                "placeholder": "e.g. 192.168.1.100"
+            },
+            {
+                "name": "TUYA_VERSION",
+                "type": "string",
+                "label": "Tuya protocol version",
+                "default": "3.5",
+                "validation": ["string"]
+            },
+            {
+                "name": "POLL_INTERVAL",
+                "type": "string",
+                "label": "Poll interval (seconds)",
+                "default": "30",
+                "validation": ["string"]
+            },
+            {
+                "name": "DP_MAP",
+                "type": "string",
+                "label": "Datapoint mapping (dpId:Name:unit:min:max,...)",
+                "default": "",
+                "placeholder": "e.g. 2:CO2:ppm:0:5000,18:Temperature:°C:-10:60"
+            },
+            {
+                "name": "DEBUG",
+                "type": "string",
+                "label": "Debug",
+                "default": ""
+            }
+        ],
+        "network_mode": "host"
+    },
+    "icon": "favicon.svg",
+    "released_at": "2026-03-13 00:00:00",
+    "version": "1.0.0"
+}

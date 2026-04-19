@@ -1,0 +1,315 @@
+version: '3.4'
+
+services:
+  2smart-core:
+    image: 2smartdev/2smart-standalone-core:${TAG:-release}
+    container_name: 2smart-core
+    restart: always
+    logging: &default-logging
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: "20m"
+    environment:
+      - MQTT_USER=${MQTT_ROOT_USERNAME}
+      - MQTT_PASS=${MQTT_ROOT_PASSWORD}
+      - MQTT_URI=${MQTT_URI}
+      - DB_USERNAME=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - DB_NAME=${MYSQL_DATABASE}
+      - DB_HOSTNAME=${MYSQL_HOST}
+      - DB_PORT=3306
+      - GITLAB_SERVER=${GITLAB_SERVER}
+      - GITLAB_SERVER_USER=${GITLAB_SERVER_USER}
+      - GITLAB_SERVER_PASS=${GITLAB_SERVER_PASS}
+      - REGISTRY_SERVER=${REGISTRY_SERVER}
+      - BRIDGES_TAG=${BRIDGES_TAG:-market}
+      - TZ=${TIMEZONE}
+      - HOST_MAIN_PATH=${ROOT_DIR_2SMART}
+      - EXTENSIONS_INSTALL_PATH=${EXTENSIONS_INSTALL_PATH:-/etc/extensions}
+      - EXTENSIONS_ICONS_DIR_NAME=${EXTENSIONS_ICONS_DIR_NAME:-icons}
+      - SMART_DOMAIN=${SMART_DOMAIN:-standalone.2smart.com}
+      - SYSTEM_NOTIFICATIONS_HASH=${SYSTEM_NOTIFICATIONS_HASH}
+      - SYSTEM_NOTIFICATIONS_LIMIT=${SYSTEM_NOTIFICATIONS_LIMIT:-500}
+    volumes:
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${ROOT_DIR_2SMART}/system/bridges:/app/etc/bridge.configs
+      - ${ROOT_DIR_2SMART}/system/bridge-types:/app/etc/bridge-type.configs
+      - ${ROOT_DIR_2SMART}/system/shared:/app/etc/shared
+      - ${ROOT_DIR_2SMART}/system/extensions:${EXTENSIONS_INSTALL_PATH:-/etc/extensions}
+    networks:
+      - app-network
+  2smart-emqx:
+    image: 2smartdev/2smart-standalone-emqx-service:${TAG:-release}
+    container_name: 2smart-emqx
+    logging: *default-logging
+    restart: always
+    environment:
+      - EMQX_NAME=emqx_broker
+      - EMQX_HOST=127.0.0.1
+      - EMQX_LISTENER__SSL__EXTERNAL__KEYFILE=/etc/emqx/ssl/private/server-key.pem
+      - EMQX_LISTENER__SSL__EXTERNAL__CERTFILE=/etc/emqx/ssl/certs/server-cert.pem
+      - EMQX_LISTENER__WSS__EXTERNAL__KEYFILE=/etc/emqx/ssl/private/server-key.pem
+      - EMQX_LISTENER__WSS__EXTERNAL__CERTFILE=/etc/emqx/ssl/certs/server-cert.pem
+      - EMQX_LOADED_PLUGINS="emqx_management | emqx_auth_mysql | emqx_recon | emqx_retainer"
+      - EMQX_AUTH__MYSQL__SERVER=${MYSQL_HOST}:3306
+      - EMQX_AUTH__MYSQL__DATABASE=${MYSQL_DATABASE}
+      - EMQX_AUTH__MYSQL__USERNAME=${MYSQL_USER}
+      - EMQX_AUTH__MYSQL__PASSWORD=${MYSQL_PASSWORD}
+      - EMQX_LISTENER__WS__EXTERNAL__PROXY_PROTOCOL=off
+      - EMQX_LISTENER__WSS__EXTERNAL__PROXY_PROTOCOL=off
+      - EMQX_ENABLE_ACL_CACHE=off
+      - EMQX_ACL_NOMATCH=deny
+      - EMQX_ALLOW_ANONYMOUS=false
+      - WAIT_HOSTS=${MYSQL_HOST}:3306
+      - WAIT_HOSTS_TIMEOUT=10
+      - EMQX_RETAINER__STORAGE_TYPE=disc
+      - EMQX_ZONE__EXTERNAL__MQUEUE_STORE_QOS0=false
+      - EMQX_ZONE__EXTERNAL__MAX_MQUEUE_LEN=10000
+      - TZ=${TIMEZONE}
+    depends_on:
+      - ssl-certs
+    ports:
+      - ${EMQX_TCP_PORT:-1883}:1883
+      - ${EMQX_TCP_SSL_PORT:-8883}:8883
+    volumes:
+      - ${ROOT_DIR_2SMART}/system/ssl:/etc/emqx/ssl
+      - ${ROOT_DIR_2SMART}/system/emqx/data/mnesia:/opt/emqx/data/mnesia
+    networks:
+      - app-network
+  2smart-ui:
+    image: 2smartdev/2smart-standalone-ui:${TAG:-release}
+    container_name: 2smart-ui
+    logging: *default-logging
+    restart: always
+    environment:
+      - MQTT_USER=${MQTT_ROOT_USERNAME}
+      - MQTT_PASS=${MQTT_ROOT_PASSWORD}
+      - API_PREFIX="/api/v1/"
+      - BACKUP_API_PREFIX="/"
+      - NODE_ENV="production"
+      - TZ=${TIMEZONE}
+      - MQTT_CACHE_LIMIT=${MQTT_CACHE_LIMIT}
+    networks:
+      - app-network
+  2smart-mysql:
+    image: 2smartdev/2smart-standalone-mysql-service:${TAG:-release}
+    container_name: 2smart-mysql
+    logging: *default-logging
+    restart: always
+    volumes:
+      - ${ROOT_DIR_2SMART}/system/mysql:/var/lib/mysql
+      - ${ROOT_DIR_2SMART}/system/ssl:/etc/mysql/ssl
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - TZ=${TIMEZONE}
+    depends_on:
+      - ssl-certs
+    networks:
+      - app-network
+  client-dashboard-be:
+    image: 2smartdev/2smart-standalone-backend:${TAG:-release}
+    container_name: client-dashboard-be
+    logging: *default-logging
+    restart: always
+    environment:
+      - MQTT_USER=${MQTT_ROOT_USERNAME}
+      - MQTT_PASS=${MQTT_ROOT_PASSWORD}
+      - MQTT_URI=${MQTT_URI}
+      - DB_USERNAME=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - DB_NAME=${MYSQL_DATABASE}
+      - DB_HOSTNAME=${MYSQL_HOST}
+      - DB_PORT=3306
+      - APP_PORT=8000
+      - WAIT_HOSTS=${MYSQL_HOST}:3306
+      - MODE=production
+      - JWT_TOKEN_SECRET=${JWT_TOKEN_SECRET}
+      - JWT_TOKEN_AUTO_EXIT_PIN_MAX_AGE=${JWT_TOKEN_AUTO_EXIT_PIN_MAX_AGE}
+      - JWT_TOKEN_PIN_MAX_AGE=${JWT_TOKEN_PIN_MAX_AGE}
+      - JWT_TOKEN_PASSWORD_MAX_AGE=${JWT_TOKEN_PASSWORD_MAX_AGE}
+      - MQTT_ROOT_PASSWORD=${MQTT_ROOT_PASSWORD}
+      - MQTT_ROOT_USERNAME=${MQTT_ROOT_USERNAME}
+      - TZ=${TIMEZONE}
+      - EXTENSIONS_INSTALL_PATH=${EXTENSIONS_INSTALL_PATH:-/etc/extensions}
+      - EXTENSIONS_ICONS_DIR_NAME=${EXTENSIONS_ICONS_DIR_NAME:-icons}
+      - EXTENSIONS_PROJECT_KEYWORD=${EXTENSIONS_PROJECT_KEYWORD:-2smart}
+      - WAIT_HOSTS_TIMEOUT=10
+      - CHANGELOGS_PATH=${CHANGELOGS_PATH:-/etc/changelogs}
+    volumes:
+      - ${ROOT_DIR_2SMART}/system/filebeat:/var/log/filebeat-logs
+      - ${ROOT_DIR_2SMART}/system/extensions:${EXTENSIONS_INSTALL_PATH:-/etc/extensions}
+      - ${ROOT_DIR_2SMART}/system/changelogs:${CHANGELOGS_PATH:-/etc/changelogs}
+    networks:
+      - app-network
+  influxdb:
+    image: 2smartdev/2smart-standalone-influx-service:${TAG:-release}
+    container_name: influxdb
+    logging: *default-logging
+    restart: always
+    environment:
+      - INFLUXDB_DB=${INFLUX_DATABASE}
+      - INFLUXDB_ADMIN_USER=${INFLUX_ROOT_USER:-root}
+      - INFLUXDB_ADMIN_PASSWORD=${INFLUX_ROOT_PASSWORD:-2smart}
+      - INFLUXDB_BIND_ADDRESS=0.0.0.0:8088
+      - INFLUXDB_HTTP_LOG_ENABLED=false
+      - TZ=${TIMEZONE}
+      - ROTATION_DAYS=${INFLUX_ROTATION_DAYS}
+    volumes:
+      - ${ROOT_DIR_2SMART}/system/influxdb:/var/lib/influxdb
+    networks:
+      - app-network
+  time-series-service:
+    image: 2smartdev/2smart-standalone-time-series:${TAG:-release}
+    container_name: time-series-service
+    logging: *default-logging
+    restart: always
+    environment:
+      - MQTT_USER=${MQTT_ROOT_USERNAME}
+      - MQTT_PASS=${MQTT_ROOT_PASSWORD}
+      - MQTT_BROKER_URI=${MQTT_URI}
+      - INFLUX_HOST=${INFLUX_HOST}
+      - INFLUX_DATABASE=${INFLUX_DATABASE}
+      - TZ=${TIMEZONE}
+    networks:
+      - app-network
+  scenario-runner:
+    image: 2smartdev/2smart-standalone-scenario-runner:${TAG:-release}
+    container_name: scenario-runner
+    logging: *default-logging
+    restart: always
+    environment:
+      - MQTT_USER=${MQTT_ROOT_USERNAME}
+      - MQTT_PASS=${MQTT_ROOT_PASSWORD}
+      - MQTT_URI=${MQTT_URI}
+      - DB_USERNAME=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - DB_NAME=${MYSQL_DATABASE}
+      - DB_HOSTNAME=${MYSQL_HOST}
+      - DB_PORT=3306
+      - TZ=${TIMEZONE}
+      - INFLUX_HOST=${INFLUX_HOST}
+      - INFLUX_DATABASE=${INFLUX_DATABASE}
+      - EXTENSIONS_INSTALL_PATH=${EXTENSIONS_INSTALL_PATH:-/etc/extensions}
+      - SYSTEM_NOTIFICATIONS_HASH=${SYSTEM_NOTIFICATIONS_HASH}
+    volumes:
+      - ${ROOT_DIR_2SMART}/system/scenarios:/app/scenarios
+      - ${ROOT_DIR_2SMART}/system/extensions/simple-scenario:${EXTENSIONS_INSTALL_PATH:-/etc/extensions}/simple-scenario
+    networks:
+      - app-network
+  ssl-certs:
+    image: 2smartdev/2smart-standalone-ssl-certs:${TAG:-release}
+    container_name: 2smart-ssl-certs
+    logging: *default-logging
+    environment:
+      - DNS=${HOSTNAME:-localhost}
+    volumes:
+      - ${ROOT_DIR_2SMART}/system/ssl/certs:/app/certs
+      - ${ROOT_DIR_2SMART}/system/ssl/private:/app/private
+  2smart-nginx:
+    image: 2smartdev/2smart-standalone-nginx-service:${TAG:-release}
+    container_name: 2smart-nginx
+    logging: *default-logging
+    restart: always
+    environment:
+      - TZ=${TIMEZONE}
+    volumes:
+      - ${ROOT_DIR_2SMART}/system/ssl:/etc/nginx/ssl
+      - ${ROOT_DIR_2SMART}/system/shared/nginx:/var/www/shared
+      - ${ROOT_DIR_2SMART}/system/bridge-types:/var/tmp/resources/bridge-types
+    depends_on:
+      - ssl-certs
+    networks:
+      - app-network
+    ports:
+      - ${NGINX_HTTP_PORT:-80}:80
+      - ${NGINX_HTTPS_PORT:-443}:443
+  2smart-heartbeat:
+    image: 2smartdev/2smart-standalone-heartbeat:${TAG:-release}
+    container_name: 2smart-heartbeat
+    logging: *default-logging
+    restart: always
+    environment:
+      - MQTT_USER=${MQTT_ROOT_USERNAME}
+      - MQTT_PASS=${MQTT_ROOT_PASSWORD}
+      - MQTT_URI=${MQTT_URI}
+      - TZ=${TIMEZONE}
+    networks:
+      - app-network
+  2smart-filebeat:
+    image: 2smartdev/2smart-standalone-filebeat-service:${TAG:-release}
+    container_name: 2smart-filebeat
+    logging: *default-logging
+    restart: always
+    volumes:
+      - ${ROOT_DIR_2SMART}/system/filebeat:/usr/share/filebeat/2smart
+      - ${DOCKER_CONTAINERS:-/var/lib/docker/containers}:/usr/share/filebeat/dockerlogs:ro
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+    networks:
+      - app-network
+  backup-service:
+    image: 2smartdev/2smart-standalone-backup-service:${TAG:-release}
+    container_name: backup-service
+    logging: *default-logging
+    restart: always
+    volumes:
+      - ${ROOT_DIR_2SMART}/system/dumps:/dumps
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MQTT_USER=${MQTT_ROOT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_ROOT_PASSWORD}
+      - INFLUX_DATABASE=${INFLUX_DATABASE}
+      - INFLUX_HOST=${INFLUX_HOST}
+      - TZ=${TIMEZONE}
+      - BACKUPS_MEMORY_LIMIT=${BACKUPS_MEMORY_LIMIT}
+    networks:
+      - app-network
+  2smart-updater:
+    image: 2smartdev/2smart-standalone-updater:${TAG:-release}
+    container_name: 2smart-updater
+    logging: *default-logging
+    restart: always
+    environment:
+      - MQTT_USER=${MQTT_ROOT_USERNAME}
+      - MQTT_PASS=${MQTT_ROOT_PASSWORD}
+      - MQTT_URI=${MQTT_URI}
+      - GITLAB_SERVER=${GITLAB_SERVER}
+      - GITLAB_SERVER_USER=${GITLAB_SERVER_USER}
+      - GITLAB_SERVER_PASS=${GITLAB_SERVER_PASS}
+      - REGISTRY_SERVER=${REGISTRY_SERVER}
+      - TZ=${TIMEZONE}
+      - IGNORE_YML_FILES=${IGNORE_YML_FILES}
+      - SMART_DOMAIN=${SMART_DOMAIN:-standalone.2smart.com}
+      - CHANGELOG_PATH=${CHANGELOG_PATH}
+      - DOWNLOAD_DOCKER_COMPOSE_PATH=${DOWNLOAD_DOCKER_COMPOSE_PATH}
+      - RELEASES_LIST_PATH=${RELEASES_LIST_PATH}
+    volumes:
+      - ${DOCKER_DIR:-/var/lib/docker}:/var/lib/docker
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${ROOT_DIR_2SMART}/system/updater:/app/data
+      - ${ROOT_DIR_2SMART}:/2smart
+    networks:
+      - app-network
+  2smart-updater-manager:
+    image: 2smartdev/2smart-standalone-updater-manager:${TAG:-release}
+    container_name: 2smart-updater-manager
+    logging: *default-logging
+    environment:
+      - REGISTRY_SERVER=${REGISTRY_SERVER}
+      - TZ=${TIMEZONE}
+    volumes:
+      - ${DOCKER_DIR:-/var/lib/docker}:/var/lib/docker
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${ROOT_DIR_2SMART}:/2smart
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

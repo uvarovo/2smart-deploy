@@ -1,0 +1,1 @@
+{"title":"Auto Discovery","type":"auto-discovery-service","registry":"2smartdev/2smart-standalone-auto-discovery-bridge","configuration":{"fields":[{"name":"DEVICE_NAME","type":"string","label":"Service name","default":"Auto Discovery"}],"network_mode":"host"},"icon":"favicon.svg","released_at":"2020-09-17 11:57:19","version":"market"}

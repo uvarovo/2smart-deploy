@@ -1,0 +1,22 @@
+# Real secrets — never commit
+.env
+docker-compose.custom.yml
+
+# Runtime state (created by 2smart-core at runtime, per-host)
+system/bridges/
+system/shared/*
+!system/shared/.gitkeep
+system/extensions/*
+!system/extensions/.gitkeep
+system/data/
+system/dumps/
+system/emqx/
+system/changelogs/
+system/*ssl*/
+system/*cert*/
+
+# Ops leftovers
+docker-compose.yml.copy
+*.log
+node_modules/
+.DS_Store

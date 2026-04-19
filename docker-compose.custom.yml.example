@@ -1,0 +1,12 @@
+version: '3.4'
+
+services:
+  2smart-emqx:
+    environment:
+      - EMQX_LOADED_PLUGINS="emqx_management | emqx_auth_mysql | emqx_recon | emqx_retainer | emqx_dashboard"
+    ports:
+      - "18083:18083"
+  2smart-nginx:
+    volumes:
+      - ${ROOT_DIR_2SMART}/system/uvarovo_ssl/uvarovo.net.chain:/etc/nginx/ssl/certs/server-cert.pem
+      - ${ROOT_DIR_2SMART}/system/uvarovo_ssl/uvarovo.net.key:/etc/nginx/ssl/private/server-key.pem

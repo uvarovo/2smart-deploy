@@ -1,0 +1,9 @@
+services:
+  tuya-bridge:
+    build: .
+    container_name: 2smart-tuya-bridge
+    network_mode: host
+    restart: always
+    env_file: .env
+    volumes:
+      - ./.env:/app/.env:ro

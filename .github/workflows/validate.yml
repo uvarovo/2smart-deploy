@@ -1,0 +1,45 @@
+name: Validate
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  compose-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write a throwaway .env from .env.example
+        run: |
+          cp .env.example .env
+          # Installers/validators fail on unset vars; give them placeholders.
+          sed -i 's|CHANGE_ME_[a-zA-Z0-9_-]*|placeholder|g' .env
+      - name: Validate docker-compose.yml
+        run: docker compose -f docker-compose.yml --env-file .env config > /dev/null
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ludeeus/action-shellcheck@master
+        with:
+          severity: error
+          scandir: '.'
+          ignore_paths: 'bridges-custom'
+
+  tuya-bridge-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: node --check app.js
+        run: node --check bridges-custom/tuya-bridge/app.js
+      - name: node --check lib/*.js
+        run: |
+          for f in bridges-custom/tuya-bridge/lib/*.js; do
+            echo "--- $f"
+            node --check "$f"
+          done
