@@ -1,1 +1,40 @@
-{"title":"OpenWeatherMap Bridge","type":"openweathermap-bridge","registry":"2smartdev/2smart-standalone-openweathermap-bridge","configuration":{"fields":[{"name":"DEVICE_NAME","type":"string","label":"Device name","default":"OpenWeatherMap Bridge","validation":["string"]},{"name":"OPENWEATHERMAP_APP_ID","type":"string","label":"OpenWeatherMap API key*","default":"","validation":["required","string"]},{"name":"DEBUG","type":"string","label":"Debug","default":null}],"volumes":{"{BRIDGE}/openweathermap":"/etc/openweathermap"}},"icon":"favicon.svg","released_at":"2021-05-26 12:16:04","version":"release-v20210526121604"}
+{
+  "title": "OpenWeatherMap Bridge",
+  "type": "openweathermap-bridge",
+  "registry": "uvarovo/2smart-standalone-openweathermap-bridge",
+  "configuration": {
+    "fields": [
+      {
+        "name": "DEVICE_NAME",
+        "type": "string",
+        "label": "Device name",
+        "default": "OpenWeatherMap Bridge",
+        "validation": [
+          "string"
+        ]
+      },
+      {
+        "name": "OPENWEATHERMAP_APP_ID",
+        "type": "string",
+        "label": "OpenWeatherMap API key*",
+        "default": "",
+        "validation": [
+          "required",
+          "string"
+        ]
+      },
+      {
+        "name": "DEBUG",
+        "type": "string",
+        "label": "Debug",
+        "default": null
+      }
+    ],
+    "volumes": {
+      "{BRIDGE}/openweathermap": "/etc/openweathermap"
+    }
+  },
+  "icon": "favicon.svg",
+  "released_at": "2021-05-26 12:16:04",
+  "version": "release-v20210526121604"
+}

@@ -1,1 +1,48 @@
-{"title":"Xiaomi Gateway Bridge","type":"xiaomi-gateway-bridge","registry":"2smartdev/2smart-standalone-xiaomi-bridge","configuration":{"fields":[{"name":"DEVICE_NAME","type":"string","label":"Device name","default":"Xiaomi Gateway Bridge","validation":[]},{"name":"DEVICE_IP","type":"string","label":"Xiaomi Gateway IP*","validation":["required","string"]},{"name":"API_KEY","type":"string","label":"API Key*","validation":["required","string"]},{"name":"SECURE","type":"boolean","label":"Enable TLS","default":true,"validation":[]}],"volumes":{"./system/ssl/certs":"/app/lib/etc/certs"},"network_mode":"host"},"icon":"favicon.svg","released_at":"2020-09-17 11:02:45","version":"market"}
+{
+  "title": "Xiaomi Gateway Bridge",
+  "type": "xiaomi-gateway-bridge",
+  "registry": "uvarovo/2smart-standalone-xiaomi-bridge",
+  "configuration": {
+    "fields": [
+      {
+        "name": "DEVICE_NAME",
+        "type": "string",
+        "label": "Device name",
+        "default": "Xiaomi Gateway Bridge",
+        "validation": []
+      },
+      {
+        "name": "DEVICE_IP",
+        "type": "string",
+        "label": "Xiaomi Gateway IP*",
+        "validation": [
+          "required",
+          "string"
+        ]
+      },
+      {
+        "name": "API_KEY",
+        "type": "string",
+        "label": "API Key*",
+        "validation": [
+          "required",
+          "string"
+        ]
+      },
+      {
+        "name": "SECURE",
+        "type": "boolean",
+        "label": "Enable TLS",
+        "default": true,
+        "validation": []
+      }
+    ],
+    "volumes": {
+      "./system/ssl/certs": "/app/lib/etc/certs"
+    },
+    "network_mode": "host"
+  },
+  "icon": "favicon.svg",
+  "released_at": "2020-09-17 11:02:45",
+  "version": "market"
+}

@@ -448,29 +448,14 @@ download_2smart_composer() {
 }
 
 download_2smart() {
-	if [ -r docker-compose.yml ] || [ -r .env ]; then
-		while true; do
-			read -p "2smart settings found. Overwrite?[Y/n]" yn
-			case $yn in
-				[Yy]* )
-                    remove_app_artifacts
-					download_2smart_composer
-					download_2smart_env
-					SETTINGS_OVERWRITTEN=1
-					break
-				;;
-				[Nn]* ) break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
-	fi
-
+	# Patched for uvarovo/2smart-deploy:
+	# docker-compose.yml is shipped in this repo, and .env is user-prepared from .env.example.
+	# Never fetch from standalone.2smart.com — we're fully self-hosted on uvarovo/* images.
 	if [ ! -r docker-compose.yml ]; then
-		download_2smart_composer
+		error_handler "docker-compose.yml is missing. This repo ships one — did you run install from inside the repo clone?"
 	fi
-
 	if [ ! -r .env ]; then
-		download_2smart_env
+		error_handler ".env is missing. Copy .env.example to .env and fill in values before running install."
 	fi
 }
 
