@@ -78,8 +78,11 @@ backup_docker_compose() {
 }
 
 download_2smart_compose() {
+	# Patched for uvarovo/2smart-deploy: pull latest docker-compose.yml from our own git repo
+	# instead of upstream standalone.2smart.com. Requires this script to be run from inside a git clone.
 	sh_c=$(root_exec_cmd)
-	$sh_c "curl https://standalone.2smart.com/releases/docker-compose.yml > $DOCKER_COMPOSE_FILE_PATH"
+	$sh_c "cd $ROOT_DIR_2SMART && git fetch --quiet origin && git checkout --quiet origin/main -- docker-compose.yml" \
+		|| error_handler "Failed to update docker-compose.yml from git. Make sure $ROOT_DIR_2SMART is a git clone of uvarovo/2smart-deploy."
 }
 
 wait_start() {
