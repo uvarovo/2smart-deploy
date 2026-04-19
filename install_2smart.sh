@@ -669,12 +669,41 @@ qst_post_install_2smart() {
 	done
 }
 
+## Pre-pull every bridge image referenced in system/bridge-types/*/update.configuration.json
+## so "Install" clicks in Market work entirely from the local docker cache and never
+## need outbound network traffic to Docker Hub at runtime.
+prepull_bridge_images() {
+	sh_c=$(root_exec_cmd)
+	bridge_types_dir="$ROOT_DIR_2SMART/system/bridge-types"
+
+	if [ ! -d "$bridge_types_dir" ]; then
+		return 0
+	fi
+
+	echo "Pre-pulling bridge images for offline Market installs..."
+	for config in $(find "$bridge_types_dir" -name 'update.configuration.json' 2>/dev/null); do
+		registry=$(sed -n 's/.*"registry":"\([^"]*\)".*/\1/p' "$config")
+		[ -z "$registry" ] && continue
+		# Only pre-pull our own namespace; leave third-party registries alone (yahoo-weather etc).
+		case "$registry" in
+			uvarovo/*) ;;
+			*) continue ;;
+		esac
+		# Use :market tag (always published by CI; matches core's default when no tag is pinned).
+		image="$registry:market"
+		echo "  -> $image"
+		$sh_c "docker pull $image" || echo "     (skip: pull failed; UI install will retry on demand)"
+	done
+}
+
 start_2smart() {
 	if is_docker_installed && command_exists docker-compose; then
 		sh_c=$(root_exec_cmd)
 
 		$sh_c "docker-compose pull"
 		$sh_c "COMPOSE_HTTP_TIMEOUT=200 docker-compose up -d"
+
+		prepull_bridge_images
 
 		wait_start
 
