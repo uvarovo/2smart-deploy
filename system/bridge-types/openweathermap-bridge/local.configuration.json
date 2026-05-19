@@ -1,5 +1,5 @@
 {
-  "title": "OpenWeatherMap Bridge",
+  "title": "Weather Bridge (Open-Meteo)",
   "type": "openweathermap-bridge",
   "registry": "uvarovo/2smart-standalone-openweathermap-bridge",
   "configuration": {
@@ -16,10 +16,9 @@
       {
         "name": "OPENWEATHERMAP_APP_ID",
         "type": "string",
-        "label": "OpenWeatherMap API key*",
+        "label": "OpenWeatherMap API key (deprecated, leave empty)",
         "default": "",
         "validation": [
-          "required",
           "string"
         ]
       },
@@ -35,6 +34,6 @@
     }
   },
   "icon": "favicon.svg",
-  "released_at": "2021-05-26 12:16:04",
-  "version": "release-v20210526121604"
+  "released_at": "2026-05-19 09:30:00",
+  "version": "market"
 }
