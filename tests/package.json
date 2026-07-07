@@ -1,0 +1,21 @@
+{
+  "name": "tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "PLAYWRIGHT_BROWSERS_PATH=./.browsers npx playwright test --config=playwright.config.js",
+    "test:api": "PLAYWRIGHT_BROWSERS_PATH=./.browsers npx playwright test specs/05-api-health.spec.js --config=playwright.config.js",
+    "test:ui": "PLAYWRIGHT_BROWSERS_PATH=./.browsers npx playwright test specs/01-login.spec.js specs/02-service-manager.spec.js specs/03-market-extensions.spec.js specs/04-scenarios.spec.js --config=playwright.config.js",
+    "test:report": "PLAYWRIGHT_BROWSERS_PATH=./.browsers npx playwright show-report report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "playwright": "^1.44.1"
+  }
+}
