@@ -24,7 +24,7 @@ CURRENT_DIR_NAME=${PWD##*/}
 
 # SMART_POST_INSTALL_IMAGE="$DOCKER_2SMART_REGISTRY/2smart/standalone/utils/post-installation-service:release"
 
-SMART_CONFIG_URL=https://standalone.2smart.com
+SMART_CONFIG_URL=
 SMART_STATIC_BASE_PATH=releases
 
 error_handler() {
