@@ -45,7 +45,7 @@ services:
       - app-network
 
   2smart-emqx:
-    image: uvarovo/2smart-standalone-emqx-service:latest
+    image: uvarovo/2smart-standalone-emqx-service:v5
     container_name: 2smart-emqx-test
     restart: always
     logging:
@@ -56,25 +56,13 @@ services:
     environment:
       - EMQX_NAME=emqx_broker_test
       - EMQX_HOST=127.0.0.1
-      - EMQX_LISTENER__SSL__EXTERNAL__KEYFILE=/etc/emqx/ssl/private/server-key.pem
-      - EMQX_LISTENER__SSL__EXTERNAL__CERTFILE=/etc/emqx/ssl/certs/server-cert.pem
-      - EMQX_LISTENER__WSS__EXTERNAL__KEYFILE=/etc/emqx/ssl/private/server-key.pem
-      - EMQX_LISTENER__WSS__EXTERNAL__CERTFILE=/etc/emqx/ssl/certs/server-cert.pem
-      - EMQX_LOADED_PLUGINS="emqx_management | emqx_auth_mysql | emqx_recon | emqx_retainer"
-      - EMQX_AUTH__MYSQL__SERVER=2smart-mysql-test:3306
-      - EMQX_AUTH__MYSQL__DATABASE=${MYSQL_DATABASE}
-      - EMQX_AUTH__MYSQL__USERNAME=${MYSQL_USER}
-      - EMQX_AUTH__MYSQL__PASSWORD=${MYSQL_PASSWORD}
-      - EMQX_LISTENER__WS__EXTERNAL__PROXY_PROTOCOL=off
-      - EMQX_LISTENER__WSS__EXTERNAL__PROXY_PROTOCOL=off
-      - EMQX_ENABLE_ACL_CACHE=off
-      - EMQX_ACL_NOMATCH=deny
-      - EMQX_ALLOW_ANONYMOUS=false
+      - EMQX_MYSQL_HOST=2smart-mysql-test
+      - EMQX_MYSQL_PORT=3306
+      - EMQX_MYSQL_DATABASE=${MYSQL_DATABASE}
+      - EMQX_MYSQL_USER=${MYSQL_USER}
+      - EMQX_MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - WAIT_HOSTS=2smart-mysql-test:3306
       - WAIT_HOSTS_TIMEOUT=60
-      - EMQX_RETAINER__STORAGE_TYPE=disc
-      - EMQX_ZONE__EXTERNAL__MQUEUE_STORE_QOS0=false
-      - EMQX_ZONE__EXTERNAL__MAX_MQUEUE_LEN=10000
       - TZ=${TIMEZONE}
     depends_on:
       - ssl-certs
@@ -83,7 +71,8 @@ services:
       - ${EMQX_TCP_PORT:-1887}:1883
       - ${EMQX_TCP_SSL_PORT:-8887}:8883
     volumes:
-      - ${ROOT_DIR_2SMART}/system/ssl:/etc/emqx/ssl
+      - ${ROOT_DIR_2SMART}/system/ssl:/opt/emqx/ssl
+      - emqx-data-test:/opt/emqx/data
     networks:
       - app-network
 
@@ -118,6 +107,7 @@ services:
       - SMART_DOMAIN=${SMART_DOMAIN}
       - SYSTEM_NOTIFICATIONS_HASH=${SYSTEM_NOTIFICATIONS_HASH}
       - SYSTEM_NOTIFICATIONS_LIMIT=${SYSTEM_NOTIFICATIONS_LIMIT:-500}
+      - CORE_CONTAINER_NAME=2smart-core-test
     volumes:
       - ./scripts/core-init.sh:/app/core-init.sh
       - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
@@ -125,6 +115,7 @@ services:
       - ${ROOT_DIR_2SMART}/system/bridge-types:/app/etc/bridge-type.configs
       - ${ROOT_DIR_2SMART}/system/shared:/app/etc/shared
       - ${ROOT_DIR_2SMART}/system/extensions:${EXTENSIONS_INSTALL_PATH:-/etc/extensions}
+      - ${ROOT_DIR_2SMART}/system/BridgesManager.js:/app/lib/services/BridgesManager.js:ro
     networks:
       - app-network
 
@@ -383,3 +374,21 @@ services:
       - ${ROOT_DIR_2SMART}:/2smart
     networks:
       - app-network
+  weather-proxy:
+    image: node:16-alpine
+    container_name: weather-proxy-test
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: "20m"
+    command: ["node", "/app/weather-proxy.js"]
+    volumes:
+      - ./scripts/weather-proxy.js:/app/weather-proxy.js:ro
+    networks:
+      - app-network
+
+volumes:
+  emqx-data-test:
+    driver: local
