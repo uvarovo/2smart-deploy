@@ -61,9 +61,9 @@ sudo chown $USER:$USER /opt/2smart
 git clone https://github.com/uvarovo/2smart-deploy.git /opt/2smart
 cd /opt/2smart
 
-# 2. Configure env
-cp .env.example .env
-$EDITOR .env              # set HOSTNAME, ROOT_DIR_2SMART, strong passwords
+# 2. (Optional but recommended) edit defaults before install runs
+#    The installer will copy .env.example -> .env and fill in random secrets.
+$EDITOR .env.example      # set HOSTNAME, TIMEZONE, NGINX_HTTPS_PORT, etc.
 
 # 3. (Optional) override ports / mount custom SSL cert
 cp docker-compose.custom.yml.example docker-compose.custom.yml
@@ -73,9 +73,11 @@ $EDITOR docker-compose.custom.yml
 sudo ./install_2smart.sh
 
 # ↑ the installer will:
-#   - install Docker Engine and Docker Compose plugin
+#   - install Docker Engine and Docker Compose v2 plugin
+#   - create .env from .env.example and generate random passwords
 #   - pull all 2smart images
 #   - start the stack
+#   - register a post-reboot recovery cron job
 ```
 
 When the stack is up:
@@ -90,9 +92,19 @@ When the stack is up:
 sudo ./update_2smart.sh
 ```
 
-Grabs the latest `docker-compose.yml` from upstream release channel, pulls
-new images, restarts. **Note**: this overwrites `docker-compose.yml` — if
-you tweak it locally, keep edits in `docker-compose.custom.yml`.
+What it does:
+
+- Fetches the latest `docker-compose.yml` and `scripts/post-reboot-recovery.sh`
+  from this repo's `main` branch.
+- Adds any new environment variables missing from your existing `.env` without
+  overwriting your passwords or host-specific values.
+- Backs up your old `.env` to `.env.update.bak` and `docker-compose.yml` to
+  `docker-compose.yml.copy`.
+- Pulls images and does `down → up -d`.
+- Re-registers the post-reboot recovery cron job.
+
+**Note**: this overwrites `docker-compose.yml` — if you tweak it locally, keep
+edits in `docker-compose.custom.yml`.
 
 ## Custom Tuya Local bridge
 
@@ -120,6 +132,22 @@ for DP mapping, auto-detection rules, and the full MQTT topic layout.
 | `system/data/`, `system/dumps/`, `system/emqx/` | Live database + broker state. |
 | `system/shared/`, `system/extensions/` | Filled at runtime when you install extensions via Market. |
 | `docker-compose.yml.copy` | Automatic backup from `update_2smart.sh`.         |
+
+## Post-reboot recovery
+
+A cron `@reboot` job is registered by `install_2smart.sh` and `update_2smart.sh`.
+It runs `scripts/post-reboot-recovery.sh` after the host restarts:
+
+- Waits for Docker.
+- Brings the compose stack back up.
+- Waits for EMQX to accept MQTT connections.
+- Sends `event=start` to all bridge IDs listed in `BRIDGE_IDS` (workaround for
+  an EMQX retained-message race that leaves KNX/Tuya bridges stuck in `stopped`
+  after reboot).
+- Ensures `scenario-runner` is running.
+
+For fresh installs `BRIDGE_IDS` is empty. After you pair bridges, fill it in
+`.env` and run `docker compose up -d`.
 
 Check `.gitignore` for the full list.
 
