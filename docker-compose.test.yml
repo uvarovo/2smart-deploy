@@ -228,7 +228,7 @@ services:
     pull_policy: if_not_present
     mem_limit: ${SCENARIO_RUNNER_MEMORY_LIMIT:-12g}
     healthcheck:
-      test: [ "CMD-SHELL", "pgrep -f 'serve.js' || exit 1" ]
+      test: [ "CMD-SHELL", "awk '\$3 ~ /:075B\$/ && \$4 == \"01\" {found=1} END{exit (found ? 0 : 1)}' /proc/net/tcp" ]
       interval: 30s
       timeout: 10s
       retries: 3
