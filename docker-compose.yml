@@ -40,41 +40,33 @@ services:
     networks:
       - app-network
   2smart-emqx:
-    image: uvarovo/2smart-standalone-emqx-service:${TAG:-latest}
+    image: uvarovo/2smart-standalone-emqx-service:${EMQX_TAG:-v5}
     container_name: 2smart-emqx
     logging: *default-logging
     restart: always
     environment:
-      - EMQX_NAME=emqx_broker
-      - EMQX_HOST=127.0.0.1
-      - EMQX_LISTENER__SSL__EXTERNAL__KEYFILE=/etc/emqx/ssl/private/server-key.pem
-      - EMQX_LISTENER__SSL__EXTERNAL__CERTFILE=/etc/emqx/ssl/certs/server-cert.pem
-      - EMQX_LISTENER__WSS__EXTERNAL__KEYFILE=/etc/emqx/ssl/private/server-key.pem
-      - EMQX_LISTENER__WSS__EXTERNAL__CERTFILE=/etc/emqx/ssl/certs/server-cert.pem
-      - EMQX_LOADED_PLUGINS="emqx_management | emqx_auth_mysql | emqx_recon | emqx_retainer"
-      - EMQX_AUTH__MYSQL__SERVER=${MYSQL_HOST}:3306
-      - EMQX_AUTH__MYSQL__DATABASE=${MYSQL_DATABASE}
-      - EMQX_AUTH__MYSQL__USERNAME=${MYSQL_USER}
-      - EMQX_AUTH__MYSQL__PASSWORD=${MYSQL_PASSWORD}
-      - EMQX_LISTENER__WS__EXTERNAL__PROXY_PROTOCOL=off
-      - EMQX_LISTENER__WSS__EXTERNAL__PROXY_PROTOCOL=off
-      - EMQX_ENABLE_ACL_CACHE=off
-      - EMQX_ACL_NOMATCH=deny
-      - EMQX_ALLOW_ANONYMOUS=false
-      - WAIT_HOSTS=${MYSQL_HOST}:3306
-      - WAIT_HOSTS_TIMEOUT=10
-      - EMQX_RETAINER__STORAGE_TYPE=disc
-      - EMQX_ZONE__EXTERNAL__MQUEUE_STORE_QOS0=false
-      - EMQX_ZONE__EXTERNAL__MAX_MQUEUE_LEN=10000
+      # EMQX 5.x configuration (see emqx-src/Dockerfile.v5 and emqx.conf)
+      - EMQX_MYSQL_HOST=${MYSQL_HOST}
+      - EMQX_MYSQL_PORT=${MYSQL_PORT:-3306}
+      - EMQX_MYSQL_USER=${MYSQL_USER}
+      - EMQX_MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - EMQX_MYSQL_DATABASE=${MYSQL_DATABASE}
+      - WAIT_HOSTS=${MYSQL_HOST}:${MYSQL_PORT:-3306}
+      - WAIT_HOSTS_TIMEOUT=30
       - TZ=${TIMEZONE}
     depends_on:
       - ssl-certs
     ports:
       - ${EMQX_TCP_PORT:-1883}:1883
       - ${EMQX_TCP_SSL_PORT:-8883}:8883
+      - ${EMQX_WS_PORT:-8083}:8083
+      - ${EMQX_WSS_PORT:-8084}:8084
+      - ${EMQX_DASHBOARD_PORT:-18083}:18083
     volumes:
-      - ${ROOT_DIR_2SMART}/system/ssl:/etc/emqx/ssl
-      - ${ROOT_DIR_2SMART}/system/emqx/data/mnesia:/opt/emqx/data/mnesia
+      - ${ROOT_DIR_2SMART}/system/ssl:/opt/emqx/ssl
+      # EMQX 5 stores all data under /opt/emqx/data. Mnesia data from v4 is
+      # incompatible, so the whole directory is mounted (not just mnesia).
+      - ${ROOT_DIR_2SMART}/system/emqx/data:/opt/emqx/data
     networks:
       - app-network
   2smart-ui:
@@ -187,7 +179,7 @@ services:
     pull_policy: if_not_present
     mem_limit: ${SCENARIO_RUNNER_MEMORY_LIMIT:-12g}
     healthcheck:
-      test: [ "CMD-SHELL", "awk '\$3 ~ /:075B\$/ && \$4 == \"01\" {found=1} END{exit (found ? 0 : 1)}' /proc/net/tcp" ]
+      test: [ "CMD-SHELL", "awk '$3 ~ /:075B$/ && $4 == \"01\" {found=1} END{exit (found ? 0 : 1)}' /proc/net/tcp" ]
       interval: 30s
       timeout: 10s
       retries: 3
