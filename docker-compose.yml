@@ -90,6 +90,9 @@ services:
       - NODE_ENV="production"
       - TZ=${TIMEZONE}
       - MQTT_CACHE_LIMIT=${MQTT_CACHE_LIMIT}
+      - MQTT_BROKER_URI=${MQTT_BROKER_URI}
+      - API_URI=${API_URI}
+      - BACKUP_API_URI=${BACKUP_API_URI}
     networks:
       - app-network
   2smart-mysql:
