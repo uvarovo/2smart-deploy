@@ -74,6 +74,17 @@ command_exists() {
 	command -v "$@" > /dev/null 2>&1
 }
 
+# Prefer docker compose v2, fall back to legacy docker-compose v1.
+compose_cmd() {
+	if docker compose version >/dev/null 2>&1; then
+		echo "docker compose"
+	elif command_exists docker-compose; then
+		echo "docker-compose"
+	else
+		echo ""
+	fi
+}
+
 ## Get OS distribution
 get_distribution() {
 	lsb_dist=""
@@ -365,17 +376,19 @@ install_docker() {
 install_docker_compose() {
 	sh_c=$(root_exec_cmd)
 
-	## Fedora ??/30/31 installing corrupted docker-compose from link
-	## So it's different command to install docker-compose
-	## https://forums.docker.com/t/error-in-docker-compose/76753/3
+	## Install Docker Compose v2 plugin. Older docker-compose v1 is deprecated
+	## and no longer shipped by default on modern distros (e.g. Ubuntu 24.04).
 	case "$lsb_dist" in
 		fedora)
-			$sh_c "dnf -y install docker-compose"
+			$sh_c "dnf -y install docker-compose-plugin"
 		;;
 		*)
-			$sh_c "curl -sL \"https://github.com/docker/compose/releases/download/1.25.4/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose"
-			$sh_c "chmod +x /usr/local/bin/docker-compose"
-			$sh_c "ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose"
+			compose_os=$(uname -s | tr '[:upper:]' '[:lower:]')
+			compose_arch=$(uname -m)
+			$sh_c "mkdir -p /usr/local/lib/docker/cli-plugins"
+			$sh_c "curl -sL \"https://github.com/docker/compose/releases/download/v2.27.1/docker-compose-${compose_os}-${compose_arch}\" -o /usr/local/lib/docker/cli-plugins/docker-compose"
+			$sh_c "chmod +x /usr/local/lib/docker/cli-plugins/docker-compose"
+			$sh_c "ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose"
 		;;
 	esac
 }
@@ -388,26 +401,18 @@ generate_password() {
 	fi
 }
 
-append_env_conf() {
+setup_env_file() {
 	sh_c=$(root_exec_cmd)
 
-	$sh_c "echo '' >> .env"
-
-	## overwrite env vars for custom DNS
-	if [ "$DNS" != "localhost" ]; then
-		$sh_c "echo 'SSL_DNS=$DNS' >> .env"
-		$sh_c "echo 'MQTT_PROXY_URL=\"ws://$DNS/mqtt\"' >> .env"
-		$sh_c "echo 'API_URL=\"http://$DNS\"' >> .env"
+	if [ ! -r .env ]; then
+		if [ -r .env.example ]; then
+			$sh_c "cp .env.example .env"
+		else
+			error_handler ".env.example is missing. Cannot create .env automatically."
+		fi
 	fi
 
-	## overwrite system timezone
-	if [ "$SYSTEM_TZ" != "UTC" ]; then
-		$sh_c "echo 'TIMEZONE=$SYSTEM_TZ' >> .env"
-	fi
-
-	## add root 2smart dir
-	$sh_c "echo 'ROOT_DIR_2SMART=$ROOT_DIR_2SMART' >> .env"
-
+	## Generate strong random passwords
 	MYSQL_ROOT_PASSWORD=$(generate_password)
 	MYSQL_PASSWORD=$(generate_password)
 	MQTT_ROOT_PASSWORD=$(generate_password)
@@ -415,12 +420,28 @@ append_env_conf() {
 	SYSTEM_NOTIFICATIONS_HASH=$(generate_password)
 	INFLUX_ROOT_PASSWORD=$(generate_password)
 
-	$sh_c "echo 'MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD' >> .env"
-	$sh_c "echo 'MYSQL_PASSWORD=$MYSQL_PASSWORD' >> .env"
-	$sh_c "echo 'MQTT_ROOT_PASSWORD=$MQTT_ROOT_PASSWORD' >> .env"
-	$sh_c "echo 'JWT_TOKEN_SECRET=$JWT_TOKEN_SECRET' >> .env"
-	$sh_c "echo 'SYSTEM_NOTIFICATIONS_HASH=$SYSTEM_NOTIFICATIONS_HASH' >> .env"
-	$sh_c "echo 'INFLUX_ROOT_PASSWORD=$INFLUX_ROOT_PASSWORD' >> .env"
+	## Replace placeholders using '#' as sed delimiter to handle passwords safely
+	$sh_c "sed -i 's#^MYSQL_ROOT_PASSWORD=.*#MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD#' .env"
+	$sh_c "sed -i 's#^MYSQL_PASSWORD=.*#MYSQL_PASSWORD=$MYSQL_PASSWORD#' .env"
+	$sh_c "sed -i 's#^MQTT_ROOT_PASSWORD=.*#MQTT_ROOT_PASSWORD=$MQTT_ROOT_PASSWORD#' .env"
+	$sh_c "sed -i 's#^JWT_TOKEN_SECRET=.*#JWT_TOKEN_SECRET=$JWT_TOKEN_SECRET#' .env"
+	$sh_c "sed -i 's#^SYSTEM_NOTIFICATIONS_HASH=.*#SYSTEM_NOTIFICATIONS_HASH=$SYSTEM_NOTIFICATIONS_HASH#' .env"
+	$sh_c "sed -i 's#^INFLUX_ROOT_PASSWORD=.*#INFLUX_ROOT_PASSWORD=$INFLUX_ROOT_PASSWORD#' .env"
+
+	## External endpoints now come from HOSTNAME in .env.example.
+	$sh_c "sed -i 's#^HOSTNAME=.*#HOSTNAME=$DNS#' .env"
+	$sh_c "sed -i 's#^TIMEZONE=.*#TIMEZONE=$SYSTEM_TZ#' .env"
+	$sh_c "sed -i 's#^ROOT_DIR_2SMART=.*#ROOT_DIR_2SMART=$ROOT_DIR_2SMART#' .env"
+
+	## Docker host paths
+	DOCKER_ROOT_DIR=$(get_docker_root_dir)
+	$sh_c "sed -i 's#^DOCKER_DIR=.*#DOCKER_DIR=$DOCKER_ROOT_DIR#' .env"
+	$sh_c "sed -i 's#^DOCKER_CONTAINERS=.*#DOCKER_CONTAINERS=$DOCKER_ROOT_DIR/containers#' .env"
+}
+
+# Kept for backwards compatibility; install now uses setup_env_file.
+append_env_conf() {
+	setup_env_file
 }
 
 remove_app_artifacts() {
@@ -449,14 +470,16 @@ download_2smart_composer() {
 
 download_2smart() {
 	# Patched for uvarovo/2smart-deploy:
-	# docker-compose.yml is shipped in this repo, and .env is user-prepared from .env.example.
-	# Never fetch from standalone.2smart.com — we're fully self-hosted on uvarovo/* images.
+	# docker-compose.yml is shipped in this repo, and .env is created automatically
+	# from .env.example when missing. Never fetch from standalone.2smart.com —
+	# we're fully self-hosted on uvarovo/* images.
 	if [ ! -r docker-compose.yml ]; then
 		error_handler "docker-compose.yml is missing. This repo ships one — did you run install from inside the repo clone?"
 	fi
-	if [ ! -r .env ]; then
-		error_handler ".env is missing. Copy .env.example to .env and fill in values before running install."
+	if [ ! -r .env ] && [ ! -r .env.example ]; then
+		error_handler ".env and .env.example are both missing. Cannot continue."
 	fi
+	# .env will be created/populated by setup_env_file later in the install flow.
 }
 
 install_curl() {
@@ -532,6 +555,9 @@ install_2smart() {
 
 	download_2smart || error_handler "Failed to download 2smart!"
 
+	## Create/update .env from .env.example and generated secrets
+	setup_env_file || error_handler "Failed to prepare .env file!"
+
 	## Check distribution
 	case "$lsb_dist" in
 			ubuntu|debian|raspbian|centos|fedora)
@@ -551,9 +577,9 @@ install_2smart() {
 				;;
 	esac
 
-	if ! is_docker_installed || ! command_exists docker-compose; then
+	if ! is_docker_installed || ! docker compose version >/dev/null 2>&1; then
 		while true; do
-			read -p "Do you want to install docker and docker-compose (Required to run 2smart)?[Y/n]" yn
+			read -p "Do you want to install docker and docker-compose v2 (Required to run 2smart)?[Y/n]" yn
 			case $yn in
 				[Yy]* )
 					install_docker_and_compose || error_handler "Failed to install docker or docker-compose!"
@@ -565,10 +591,8 @@ install_2smart() {
 		done
 	fi
 
-	## Add docker root dir to ENV file
-	DOCKER_ROOT_DIR=$(get_docker_root_dir)
-	$sh_c "echo 'DOCKER_DIR=$DOCKER_ROOT_DIR' >> .env"
-	$sh_c "echo 'DOCKER_CONTAINERS=$DOCKER_ROOT_DIR/containers' >> .env"
+	## The .env file is fully prepared by setup_env_file earlier.
+	: # no-op
 }
 
 docker_as_nonroot() {
@@ -696,45 +720,67 @@ prepull_bridge_images() {
 	done
 }
 
-start_2smart() {
-	if is_docker_installed && command_exists docker-compose; then
-		sh_c=$(root_exec_cmd)
+install_post_reboot_recovery() {
+	sh_c=$(root_exec_cmd)
+	script_src="$ROOT_DIR_2SMART/scripts/post-reboot-recovery.sh"
+	script_dst="$ROOT_DIR_2SMART/post-reboot-recovery.sh"
 
-		$sh_c "docker-compose pull"
-		$sh_c "COMPOSE_HTTP_TIMEOUT=200 docker-compose up -d"
-
-		prepull_bridge_images
-
-		wait_start
-
-		info_2smart
-
-		# qst_post_install_2smart
-
-		user=${SUDO_USER:-$USER} # session user or user who run this script with sudo
-		# Re-evaluate session to use docker as non-root user
-		# Copy root auth credentials to user's .docker dir
-		if [ ! -z "$RESTART_SESSION" ]; then
-			home_dir="/home/$user"
-			docker_conf_dir="$home_dir/.docker"
-
-			if [ "$lsb_dist" = "centos" ]; then
-				$sh_c "cp -r /root/.docker $docker_conf_dir"
-			fi
-
+	if [ -r "$script_src" ]; then
+		$sh_c "cp '$script_src' '$script_dst'"
+		$sh_c "chmod +x '$script_dst'"
+		# Add @reboot cron job if not already present.
+		if ! $sh_c "crontab -l 2>/dev/null | grep -qF '$script_dst'"; then
 			(
-				$sh_c "chown -R $user:$user $docker_conf_dir docker-compose.yml .env"
-				$sh_c "chmod -R g+rwx $docker_conf_dir"
-			) || true
+				$sh_c "crontab -l 2>/dev/null || true"
+				$sh_c "echo \"@reboot $script_dst >> $ROOT_DIR_2SMART/post-reboot-recovery.log 2>&1\""
+			) | $sh_c "crontab -"
+		fi
+	fi
+}
 
-            su -l $user # relogin to run new session under the "docker" group
+start_2smart() {
+	COMPOSE_BIN=$(compose_cmd)
+	if [ -z "$COMPOSE_BIN" ]; then
+		echo "ERROR: Unable to start 2smart!"
+		echo "Check if docker compose (v2 plugin) or docker-compose is installed."
+		return 1
+	fi
+
+	sh_c=$(root_exec_cmd)
+
+	$sh_c "$COMPOSE_BIN pull"
+	$sh_c "COMPOSE_HTTP_TIMEOUT=200 $COMPOSE_BIN up -d"
+
+	prepull_bridge_images
+
+	wait_start
+
+	info_2smart
+
+	install_post_reboot_recovery || true
+
+	# qst_post_install_2smart
+
+	user=${SUDO_USER:-$USER} # session user or user who run this script with sudo
+	# Re-evaluate session to use docker as non-root user
+	# Copy root auth credentials to user's .docker dir
+	if [ ! -z "$RESTART_SESSION" ]; then
+		home_dir="/home/$user"
+		docker_conf_dir="$home_dir/.docker"
+
+		if [ "$lsb_dist" = "centos" ]; then
+			$sh_c "cp -r /root/.docker $docker_conf_dir"
 		fi
 
-		$sh_c "chown $user:$user docker-compose.yml .env"
-	else
-		echo "ERROR: Unable to start 2smart!"
-		echo "Check if docker and docker-compose are installed."
+		(
+			$sh_c "chown -R $user:$user $docker_conf_dir docker-compose.yml .env"
+			$sh_c "chmod -R g+rwx $docker_conf_dir"
+		) || true
+
+		su -l $user # relogin to run new session under the "docker" group
 	fi
+
+	$sh_c "chown $user:$user docker-compose.yml .env"
 }
 
 install_2smart
