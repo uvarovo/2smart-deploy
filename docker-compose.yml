@@ -179,7 +179,7 @@ services:
     pull_policy: if_not_present
     mem_limit: ${SCENARIO_RUNNER_MEMORY_LIMIT:-12g}
     healthcheck:
-      test: [ "CMD-SHELL", "awk '$3 ~ /:075B$/ && $4 == \"01\" {found=1} END{exit (found ? 0 : 1)}' /proc/net/tcp" ]
+      test: [ "CMD-SHELL", "awk '$$3 ~ /:075B$$/ && $$4 == \"01\" {found=1} END{exit (found ? 0 : 1)}' /proc/net/tcp" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -248,6 +248,8 @@ services:
     container_name: 2smart-filebeat
     logging: *default-logging
     restart: always
+    environment:
+      - DOCKER_API_VERSION=1.44
     volumes:
       - ${ROOT_DIR_2SMART}/system/filebeat:/usr/share/filebeat/2smart
       - ${DOCKER_CONTAINERS:-/var/lib/docker/containers}:/usr/share/filebeat/dockerlogs:ro
@@ -261,6 +263,7 @@ services:
     restart: always
     volumes:
       - ${ROOT_DIR_2SMART}/system/dumps:/dumps
+      - ${ROOT_DIR_2SMART}/system:/2smart/system
     environment:
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${MYSQL_USER}
