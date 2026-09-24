@@ -10,3 +10,9 @@ services:
     volumes:
       - ${ROOT_DIR_2SMART}/system/uvarovo_ssl/uvarovo.net.chain:/etc/nginx/ssl/certs/server-cert.pem
       - ${ROOT_DIR_2SMART}/system/uvarovo_ssl/uvarovo.net.key:/etc/nginx/ssl/private/server-key.pem
+  # 2smart-updater ships docker-compose v1 which can't parse the current
+  # compose file; mount the host's compose v2 binary over it.
+  # Debian/Ubuntu docker-ce path shown; adjust to `docker compose` plugin location.
+  2smart-updater:
+    volumes:
+      - /usr/libexec/docker/cli-plugins/docker-compose:/usr/local/bin/docker-compose:ro
